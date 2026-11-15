@@ -12,8 +12,12 @@ public struct KeycodeGroup: Sendable, Identifiable {
     public let title: String
     public let footer: String
     public let keycodes: [KeycodeInfo]
+    /// Keys that explain themselves (letters, numbers, F-keys): the picker shows them as plain keycaps, no description.
+    public let isPlain: Bool
     public var id: String { title }
-    public init(title: String, footer: String = "", keycodes: [KeycodeInfo]) { (self.title, self.footer, self.keycodes) = (title, footer, keycodes) }
+    public init(title: String, footer: String = "", keycodes: [KeycodeInfo], isPlain: Bool = false) {
+        (self.title, self.footer, self.keycodes, self.isPlain) = (title, footer, keycodes, isPlain)
+    }
 }
 
 /// Codes and ranges follow QMK keycodes.h: KC_ block 0x0000-0x00C2 and 0x00E0-0x00E7, QK_TO 0x5200-0x521F,
@@ -44,14 +48,22 @@ public enum Keycode {
         return KeycodeInfo(code: code, label: hex, name: "Custom code \(hex)", description: "Set by the keyboard's firmware")
     }
 
+    /// Whether the picker should explain this key. Ordinary keys (letters, Enter, Volume Up) explain themselves;
+    /// layer keys, None/Transparent, keyboard-specific codes and rarely used keys get their one-line description.
+    public static func needsExplanation(_ code: UInt16) -> Bool {
+        code > 0xFF || code == none || code == transparent || uncommon.contains(code)
+    }
+    private static let uncommon: Set<UInt16> = [0x32, 0x64, 0x46, 0x47, 0x48, 0x49, 0x53, 0x65, 0x66,
+                                                0xA5, 0xA7, 0xAF, 0xB3, 0xBF, 0xC0]
+
     public static func name(_ code: UInt16, protocolVersion: Int = VIAProtocol.keycodesV2, custom: [CustomKeycode] = []) -> String {
         info(code, protocolVersion: protocolVersion, custom: custom).name
     }
 
     /// Picker contents. Layer keys only for v2 keycodes and only for layers that exist (max 32 fit the ranges).
     public static func catalogue(layerCount: Int, protocolVersion: Int = VIAProtocol.keycodesV2, custom: [CustomKeycode] = []) -> [KeycodeGroup] {
-        func group(_ title: String, _ footer: String, _ codes: [UInt16]) -> KeycodeGroup {
-            KeycodeGroup(title: title, footer: footer, keycodes: codes.map { info($0, protocolVersion: protocolVersion) })
+        func group(_ title: String, _ footer: String, _ codes: [UInt16], plain: Bool = false) -> KeycodeGroup {
+            KeycodeGroup(title: title, footer: footer, keycodes: codes.map { info($0, protocolVersion: protocolVersion) }, isPlain: plain)
         }
         func range(_ r: ClosedRange<UInt16>) -> [UInt16] { Array(r) }
         var groups: [KeycodeGroup] = []
@@ -61,18 +73,18 @@ public enum Keycode {
                                        keycodes: codes.map { info($0, protocolVersion: protocolVersion, custom: custom) }))
         }
         groups += [
-            group("Letters & Numbers", "Types the letter or number on the cap.", range(0x04...0x1D) + range(0x1E...0x27)),
+            group("Letters & Numbers", "", range(0x04...0x1D) + range(0x1E...0x27), plain: true),
             group("Symbols", "Punctuation keys. Which character appears depends on your keyboard layout in macOS.",
-                  [0x2D, 0x2E, 0x2F, 0x30, 0x31, 0x33, 0x34, 0x35, 0x36, 0x37, 0x38, 0x32, 0x64]),
+                  [0x2D, 0x2E, 0x2F, 0x30, 0x31, 0x33, 0x34, 0x35, 0x36, 0x37, 0x38, 0x32, 0x64], plain: true),
             group("Editing", "Keys for entering, deleting and managing text.",
                   [0x28, 0x29, 0x2A, 0x4C, 0x2B, 0x2C, 0x39, 0x49, 0x65, 0x7A, 0x7B, 0x7C, 0x7D, 0x7E]),
             group("Navigation", "Move the cursor or scroll through a document.", [0x52, 0x51, 0x50, 0x4F, 0x4A, 0x4D, 0x4B, 0x4E]),
-            group("Function Keys", "F1 to F24. Apps and macOS decide what these do.", range(0x3A...0x45) + range(0x68...0x73)),
+            group("Function Keys", "F1 to F24. Apps and macOS decide what these do.", range(0x3A...0x45) + range(0x68...0x73), plain: true),
             group("Modifiers", "Hold one of these while pressing another key to make shortcuts.", range(0xE0...0xE7)),
             group("Media & System", "Volume, playback, brightness and other controls that work across the whole Mac.",
                   range(0xA8...0xB0) + [0xBB, 0xBC, 0xBD, 0xBE, 0xC1, 0xC2, 0xC0, 0xA5, 0xA6, 0xA7, 0x46, 0x47, 0x48]
                   + [0xB1, 0xB2, 0xB3, 0xB4, 0xB5, 0xB6, 0xB7, 0xB8, 0xB9, 0xBA, 0xBF]),
-            group("Keypad", "Number pad keys.", [0x53, 0x54, 0x55, 0x56, 0x57, 0x58] + range(0x59...0x62) + [0x63, 0x67, 0x85]),
+            group("Keypad", "Number pad keys.", [0x53, 0x54, 0x55, 0x56, 0x57, 0x58] + range(0x59...0x62) + [0x63, 0x67, 0x85], plain: true),
         ]
         if protocolVersion >= VIAProtocol.keycodesV2 {
             let layers = (0..<min(max(layerCount, 0), 32)).flatMap { [momentary($0), to($0), toggle($0)] }

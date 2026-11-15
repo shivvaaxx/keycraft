@@ -61,7 +61,10 @@ import Testing
         let groups = Keycode.catalogue(layerCount: 3)
         #expect(groups.map(\.title) == ["Letters & Numbers", "Symbols", "Editing", "Navigation", "Function Keys", "Modifiers",
                                         "Media & System", "Keypad", "Layers", "Special"])
-        #expect(groups.allSatisfy { !$0.footer.isEmpty })
+        #expect(groups.dropFirst().allSatisfy { !$0.footer.isEmpty })   // letters need no footer
+        #expect([0x04, 0x28, 0xA9, 0xE3].allSatisfy { !Keycode.needsExplanation($0) })      // A, Enter, Volume Up, Command
+        #expect([0x00, 0x01, 0x46, Keycode.momentary(1), Keycode.qkKB].allSatisfy(Keycode.needsExplanation))
+        #expect(groups.filter(\.isPlain).map(\.title) == ["Letters & Numbers", "Symbols", "Function Keys", "Keypad"])
         let layers = groups.first { $0.title == "Layers" }!.keycodes.map(\.name)
         #expect(layers.count == 9 && layers.contains("Hold for Layer 2") && !layers.contains("Hold for Layer 3"))
         #expect(Array(layers.prefix(3)) == ["Hold for Base", "Switch to Base", "Toggle Base"])

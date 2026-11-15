@@ -48,7 +48,9 @@ struct KeyInspectorView: View {
         return VStack(alignment: .leading, spacing: 6) {
             Text("Key").font(.caption).foregroundStyle(.secondary)
             Text(info.name).font(.title2.bold()).lineLimit(2)
-            Text(info.description).font(.callout).foregroundStyle(.secondary)
+            if Keycode.needsExplanation(info.code) {
+                Text(info.description).font(.callout).foregroundStyle(.secondary)
+            }
             Text("Row \(key.row), column \(key.col) · \(Keycode.layerName(session.layer))")
                 .font(.caption).foregroundStyle(.secondary)
             status
@@ -87,14 +89,17 @@ struct KeyInspectorView: View {
         .padding(.vertical, 12)
     }
 
+    private var catalogue: [KeycodeGroup] {
+        Keycode.catalogue(layerCount: session.layerCount, protocolVersion: session.protocolVersion, custom: definition.customKeycodes)
+    }
+
     private var groups: [KeycodeGroup] {
-        let all = Keycode.catalogue(layerCount: session.layerCount, protocolVersion: session.protocolVersion,
-                                    custom: definition.customKeycodes)
+        let all = catalogue
         let q = query.trimmingCharacters(in: .whitespaces).lowercased()
         guard !q.isEmpty else { return all }
         return all.compactMap { group in
             let hits = group.keycodes.filter { [$0.name, $0.label, $0.description].contains { $0.lowercased().contains(q) } }
-            return hits.isEmpty ? nil : KeycodeGroup(title: group.title, footer: group.footer, keycodes: hits)
+            return hits.isEmpty ? nil : KeycodeGroup(title: group.title, footer: group.footer, keycodes: hits, isPlain: group.isPlain)
         }
     }
 
@@ -102,9 +107,20 @@ struct KeyInspectorView: View {
         List {
             ForEach(groups) { group in
                 Section {
-                    ForEach(group.keycodes) { key in
-                        KeycodeRow(info: key, isCurrent: key.code == currentCode) {
-                            Task { await store.assign(key.code, on: session) }
+                    if group.isPlain {
+                        LazyVGrid(columns: [GridItem(.adaptive(minimum: 40), spacing: 6)], spacing: 6) {
+                            ForEach(group.keycodes) { key in
+                                KeycodeChip(info: key, isCurrent: key.code == currentCode) {
+                                    Task { await store.assign(key.code, on: session) }
+                                }
+                            }
+                        }
+                        .padding(.vertical, 4)
+                    } else {
+                        ForEach(group.keycodes) { key in
+                            KeycodeRow(info: key, isCurrent: key.code == currentCode) {
+                                Task { await store.assign(key.code, on: session) }
+                            }
                         }
                     }
                 } header: {
@@ -129,7 +145,9 @@ private struct KeycodeRow: View {
             HStack(alignment: .firstTextBaseline) {
                 VStack(alignment: .leading, spacing: 1) {
                     Text(info.name)
-                    Text(info.description).font(.caption).foregroundStyle(.secondary).lineLimit(2)
+                    if Keycode.needsExplanation(info.code) {
+                        Text(info.description).font(.caption).foregroundStyle(.secondary).lineLimit(2)
+                    }
                 }
                 Spacer(minLength: 8)
                 if isCurrent { Image(systemName: "checkmark").foregroundStyle(Color.accentColor) }
@@ -138,6 +156,33 @@ private struct KeycodeRow: View {
         }
         .buttonStyle(.plain)
         .help(info.description)
+        .accessibilityAddTraits(isCurrent ? .isSelected : [])
+    }
+}
+
+/// A self-explanatory key (letter, number, F-key) as a small keycap: the label is all it needs.
+private struct KeycodeChip: View {
+    let info: KeycodeInfo
+    let isCurrent: Bool
+    let action: () -> Void
+
+    var body: some View {
+        let shape = RoundedRectangle(cornerRadius: 6, style: .continuous)
+        Button(action: action) {
+            Text(info.label)
+                .font(.system(size: 13, weight: .medium))
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+                .padding(.horizontal, 4)
+                .frame(maxWidth: .infinity, minHeight: 32)
+                .foregroundStyle(isCurrent ? Color.white : Color.primary)
+                .background(isCurrent ? AnyShapeStyle(Color.accentColor) : AnyShapeStyle(Color(nsColor: .controlBackgroundColor)), in: shape)
+                .overlay(shape.strokeBorder(Color(nsColor: .separatorColor), lineWidth: isCurrent ? 0 : 1))
+                .contentShape(shape)
+        }
+        .buttonStyle(.plain)
+        .help(info.name)
+        .accessibilityLabel(info.name)
         .accessibilityAddTraits(isCurrent ? .isSelected : [])
     }
 }
