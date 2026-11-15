@@ -14,6 +14,6 @@ struct ContentView: View {
                 EmptyStateView()
             }
         }
-        .backupAlert(isActive: !store.showBackups)
+        .backupAlert(isActive: !store.showBackups && !store.showMacros)
     }
 }

@@ -9,11 +9,17 @@ struct BackupAlert: ViewModifier {
     let isActive: Bool
     @State private var suppress = false
 
+    // The alert hangs off an invisible background view: switching between the two branches below would otherwise
+    // give the wrapped content a new identity, resetting its state (and re-running onAppear) mid-write.
     func body(content: Content) -> some View {
+        content.background { host }
+    }
+
+    @ViewBuilder private var host: some View {
         let shown = Binding(
             get: { store.warning != nil && isActive },
             set: { if !$0, isActive, store.warning != nil { store.resolveWarning(proceed: false) } })
-        let alerting = content
+        let alerting = Color.clear
             .alert("Unable to back up", isPresented: shown, presenting: store.warning) { _ in
                 Button("Change Anyway", role: .destructive) { store.resolveWarning(proceed: true, suppress: suppress) }
                 Button("Cancel", role: .cancel) { store.resolveWarning(proceed: false) }

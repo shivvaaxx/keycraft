@@ -13,6 +13,11 @@ enum DebugHooks {
         default: break
         }
         if env["KEYCRAFT_OPEN"] == "qmk" { store.selectDemo() }   // so the opened file has a keyboard to be drawn on
+        if env["KEYCRAFT_OPEN"] == "macros" {    // the Macros sheet on the Demo Keyboard
+            store.selectDemo()
+            for _ in 0..<50 where store.demo.macros == nil { try? await Task.sleep(for: .milliseconds(100)) }
+            store.showMacros = true
+        }
         if env["KEYCRAFT_OPEN"] == "sharing" {   // the Sharing sheet on the Demo Keyboard (it can't really be shared)
             store.selectDemo()
             try? await Task.sleep(for: .seconds(1))
@@ -31,7 +36,7 @@ enum DebugHooks {
     }
 }
 
-/// Debug builds only: `KEYCRAFT_OPEN=library|settings|sharing|qmk` opens that window or sheet at launch (for screenshots).
+/// Debug builds only: `KEYCRAFT_OPEN=library|settings|sharing|macros|qmk` opens that window or sheet at launch (for screenshots).
 struct DebugOpenWindow: ViewModifier {
     @Environment(\.openWindow) private var openWindow
     @Environment(\.openSettings) private var openSettings

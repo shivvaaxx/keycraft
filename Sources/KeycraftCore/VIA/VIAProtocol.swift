@@ -34,6 +34,8 @@ public enum VIAError: Error, Equatable, Sendable {
     case forbiddenCommand(UInt8)
     case unsupportedProtocol(Int)
     case invalidKeymapSize(expected: Int, actual: Int)
+    case macrosTooLong(bytes: Int, limit: Int)
+    case macroVerifyFailed
 }
 
 extension VIAError: LocalizedError {
@@ -45,6 +47,8 @@ extension VIAError: LocalizedError {
         case .forbiddenCommand(let c): "Command 0x\(String(c, radix: 16, uppercase: true)) is blocked in this version."
         case .unsupportedProtocol(let v): "VIA protocol version \(v) is not supported."
         case .invalidKeymapSize(let e, let a): "Backup keymap is \(a) bytes but this keyboard needs \(e)."
+        case .macrosTooLong(let b, let l): "The macros need \(b) bytes but this keyboard has room for \(l). Shorten or remove some."
+        case .macroVerifyFailed: "The macros read back from the keyboard didn't match what was written. Try saving again."
         }
     }
 }

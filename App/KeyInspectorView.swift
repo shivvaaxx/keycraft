@@ -138,7 +138,8 @@ struct KeyInspectorView: View {
     }
 
     private var catalogue: [KeycodeGroup] {
-        Keycode.catalogue(layerCount: session.layerCount, protocolVersion: session.protocolVersion, custom: definition.customKeycodes)
+        Keycode.catalogue(layerCount: session.layerCount, protocolVersion: session.protocolVersion, custom: definition.customKeycodes,
+                          macros: (session.macros ?? []).map(Macros.summary))
     }
 
     private var groups: [KeycodeGroup] {

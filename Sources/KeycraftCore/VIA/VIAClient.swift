@@ -143,7 +143,7 @@ public actor VIAClient {
         }
     }
 
-    // MARK: Macros (read-only, for backup)  keyboard-api.ts:567-598
+    // MARK: Macros  keyboard-api.ts:567-620
 
     public func macroCount() async throws -> Int {
         Int(try await request(.macroGetCount, isRead: true)[1])
@@ -163,6 +163,37 @@ public actor VIAClient {
             bytes += r[4..<4 + size]
         }
         return bytes
+    }
+
+    /// The macros on the keyboard. Throws `unsupportedProtocol` before VIA protocol 11, whose encoding differs.
+    public func readMacros() async throws -> (macros: [[MacroStep]], bufferSize: Int) {
+        let version = try await protocolVersion()
+        guard version >= Macros.minimumProtocol else { throw VIAError.unsupportedProtocol(version) }
+        let count = try await macroCount()
+        let size = try await macroBufferSize()
+        return (Macros.decode(try await readMacroBuffer(size: size), count: count), size)
+    }
+
+    /// Replaces every macro. Like VIA, the buffer's last byte is set non-zero while writing so the firmware
+    /// ignores a half-written buffer (dynamic_keymap.c:149), then cleared; everything is read back and verified.
+    public func writeMacros(_ macros: [[MacroStep]]) async throws {
+        let version = try await protocolVersion()
+        guard version >= Macros.minimumProtocol else { throw VIAError.unsupportedProtocol(version) }
+        let size = try await macroBufferSize()
+        var data = Macros.encode(macros)
+        guard data.count < size else { throw VIAError.macrosTooLong(bytes: data.count, limit: size - 1) }
+        data += [UInt8](repeating: 0, count: size - data.count)
+        let last = size - 1
+        _ = try await request(.macroSetBuffer, [UInt8(last >> 8), UInt8(last & 0xFF), 1, 0xFF], isRead: false)
+        var offset = 0
+        while offset < last {
+            let chunk = Array(data[offset..<min(offset + VIAProtocol.maxChunk, last)])
+            _ = try await request(.macroSetBuffer, [UInt8(offset >> 8), UInt8(offset & 0xFF), UInt8(chunk.count)] + chunk, isRead: false)
+            offset += chunk.count
+        }
+        _ = try await request(.macroSetBuffer, [UInt8(last >> 8), UInt8(last & 0xFF), 1, 0x00], isRead: false)
+        let back = try await readMacroBuffer(size: size)
+        guard back == data else { throw VIAError.macroVerifyFailed }
     }
 
     // MARK: Backup items (this driver's declaration)

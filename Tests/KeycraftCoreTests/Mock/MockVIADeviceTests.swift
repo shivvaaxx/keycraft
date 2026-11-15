@@ -21,7 +21,7 @@ import Testing
 
     @Test func unknownCommandAnswersFF() async throws {
         #expect(try await ask([0x14])[0] == 0xFF)    // encoder: not implemented
-        #expect(try await ask([0x0F])[0] == 0xFF)    // macro set: not implemented
+        #expect(try await ask([0x07])[0] == 0xFF)    // custom set: not implemented
     }
 
     @Test func outOfRangeRequestsAnswerFFInsteadOfTrapping() async throws {

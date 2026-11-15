@@ -35,6 +35,8 @@ public final class MockVIADevice: HIDTransport {
     public var sentReports: [[UInt8]] { state.withLock { $0.sent } }
     /// Current keymap in firmware byte order (layer-major, row-major, big-endian u16).
     public var keymapBytes: [UInt8] { state.withLock { $0.keymap } }
+    /// The raw macro buffer.
+    public var macroBytes: [UInt8] { state.withLock { $0.macros } }
 
     public convenience init() {
         self.init(rows: 5, cols: 14, layerZero: Self.layerZero.flatMap { $0 },
@@ -102,6 +104,10 @@ public final class MockVIADevice: HIDTransport {
             let (offset, size) = (Int(r[1]) << 8 | Int(r[2]), Int(r[3]))
             guard size <= VIAProtocol.maxChunk, offset + size <= s.macros.count else { return false }
             r.replaceSubrange(4..<4 + size, with: s.macros[offset..<offset + size])
+        case .macroSetBuffer:
+            let (offset, size) = (Int(r[1]) << 8 | Int(r[2]), Int(r[3]))
+            guard size <= VIAProtocol.maxChunk, offset + size <= s.macros.count else { return false }
+            s.macros.replaceSubrange(offset..<offset + size, with: r[4..<4 + size])
         case .getLayerCount:
             r[1] = UInt8(layers)
         case .keymapGetBuffer:

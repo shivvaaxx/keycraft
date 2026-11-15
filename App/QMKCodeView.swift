@@ -27,9 +27,6 @@ struct QMKCodeView: View {
     @State private var error: String?
     @State private var layerIndex = 0
     @State private var showImporter = false
-    @State private var explanation: String?
-    @State private var explaining = false
-    @State private var explainError: String?
 
     var body: some View {
         Group {
@@ -66,7 +63,7 @@ struct QMKCodeView: View {
             let size = (try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0
             guard size <= 512 * 1024 else { throw QMKKeymap.ParseError.tooLarge }
             let parsed = try QMKKeymap.parse(String(contentsOf: url, encoding: .utf8))
-            (file, fileName, error, layerIndex, explanation, explainError) = (parsed, url.lastPathComponent, nil, 0, nil, nil)
+            (file, fileName, error, layerIndex) = (parsed, url.lastPathComponent, nil, 0)
         } catch {
             (file, self.error) = (nil, error.localizedDescription)
         }
@@ -150,30 +147,6 @@ struct QMKCodeView: View {
                         ForEach(facts, id: \.self) { Label($0, systemImage: "checkmark.circle").labelStyle(FactLabelStyle()) }
                     }
                 }
-                if let explanation {
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text(Self.plainMarkdown(explanation))
-                            .textSelection(.enabled)
-                        Label("Written by Apple Intelligence on this Mac. It can be wrong.", systemImage: "sparkles")
-                            .font(.caption).foregroundStyle(.secondary)
-                    }
-                    .padding(12)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
-                } else if CodeExplainer.isAvailable {
-                    HStack {
-                        Button(explaining ? "Explaining…" : facts.isEmpty ? "Explain in Plain English" : "Explain the Rest") { explain(code, facts) }
-                            .disabled(explaining)
-                            .help("Ask Apple Intelligence, on this Mac, what the custom code does")
-                        if explaining { ProgressView().controlSize(.small) }
-                    }
-                    if code.count > CodeExplainer.maxCharacters {
-                        Text("The code is long, so only its first part is explained.").font(.caption).foregroundStyle(.secondary)
-                    }
-                } else if let reason = CodeExplainer.unavailableReason {
-                    Text(reason).font(.callout).foregroundStyle(.secondary)
-                }
-                if let explainError { Text(explainError).font(.callout).foregroundStyle(.red) }
                 DisclosureGroup("Show Code") {
                     ScrollView(.horizontal) {
                         Text(code).font(.system(.callout, design: .monospaced)).textSelection(.enabled)
@@ -182,25 +155,6 @@ struct QMKCodeView: View {
                 }
             }
         }
-    }
-
-    private func explain(_ code: String, _ facts: [String]) {
-        explaining = true
-        explainError = nil
-        Task {
-            do { explanation = try await CodeExplainer.explain(code, knownFacts: facts) } catch { explainError = error.localizedDescription }
-            explaining = false
-        }
-    }
-}
-
-extension QMKCodeView {
-    /// Bold and italics from the model's markdown, but no links: nothing in generated text should be clickable.
-    static func plainMarkdown(_ text: String) -> AttributedString {
-        var a = (try? AttributedString(markdown: text, options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace)))
-            ?? AttributedString(text)
-        for run in a.runs where run.link != nil { a[run.range].link = nil }
-        return a
     }
 }
 

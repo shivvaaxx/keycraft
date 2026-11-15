@@ -39,6 +39,9 @@ struct AppCommands: Commands {
             Button("Backups…") { store.showBackups = true }
                 .keyboardShortcut("b", modifiers: [.command, .shift])
                 .disabled(!ready)
+            Button("Macros…") { store.showMacros = true }
+                .keyboardShortcut("m", modifiers: [.command, .shift])
+                .disabled(!ready || session?.macros == nil)
             Divider()
             Button("Next Layer") { step(1) }
                 .keyboardShortcut("]")

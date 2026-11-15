@@ -44,6 +44,9 @@ public enum Keycode {
                 return layerInfo(kind, Int(code - base))
             }
             if let composite = compositeInfo(code) { return composite }
+            if let n = Macros.index(of: code) {
+                return KeycodeInfo(code: code, label: "M\(n)", name: "Macro \(n)", description: "Plays macro \(n), set up in Macros")
+            }
         }
         let hex = String(format: "0x%04X", code)
         return KeycodeInfo(code: code, label: hex, name: "Custom code \(hex)", description: "Set by the keyboard's firmware")
@@ -62,7 +65,9 @@ public enum Keycode {
     }
 
     /// Picker contents. Layer keys only for v2 keycodes and only for layers that exist (max 32 fit the ranges).
-    public static func catalogue(layerCount: Int, protocolVersion: Int = VIAProtocol.keycodesV2, custom: [CustomKeycode] = []) -> [KeycodeGroup] {
+    /// `macros` are the keyboard's macro summaries, shown as each macro key's description.
+    public static func catalogue(layerCount: Int, protocolVersion: Int = VIAProtocol.keycodesV2, custom: [CustomKeycode] = [],
+                                 macros: [String] = []) -> [KeycodeGroup] {
         func group(_ title: String, _ footer: String, _ codes: [UInt16], plain: Bool = false) -> KeycodeGroup {
             KeycodeGroup(title: title, footer: footer, keycodes: codes.map { info($0, protocolVersion: protocolVersion) }, isPlain: plain)
         }
@@ -93,6 +98,13 @@ public enum Keycode {
             groups.append(group("Layers", "Layers hold extra sets of keys. Use these to move between them.", layers))
             let oneShot = [Modifier.control, Modifier.shift, Modifier.option, Modifier.command].map(oneShotModifier)
                 + (1..<min(max(layerCount, 0), 32)).map(oneShotLayer)
+            if !macros.isEmpty {
+                groups.append(KeycodeGroup(title: "Macros", footer: "Each plays a set of key presses you record in Macros.",
+                    keycodes: macros.prefix(128).enumerated().map { i, summary in
+                        let base = info(Macros.keycode(i))
+                        return KeycodeInfo(code: base.code, label: base.label, name: base.name, description: summary)
+                    }))
+            }
             groups.append(group("One-Shot", "Tap once and it applies to the next key you press, so you don't have to hold it.", oneShot))
         }
         groups.append(group("Special", "Keys that do nothing themselves.", [none, transparent]))

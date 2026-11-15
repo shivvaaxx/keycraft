@@ -22,6 +22,12 @@ struct KeyboardDetailView: View {
                         .help(session.layer == 0 ? "Keys you get without holding a layer key"
                               : "Active while a key assigned to \(Keycode.layerName(session.layer)) is held or toggled")
                     }
+                    if session.macros != nil {
+                        ToolbarItem {
+                            Button("Macros", systemImage: "record.circle") { store.showMacros = true }
+                                .help("Record key presses that one key plays back")
+                        }
+                    }
                     ToolbarItem {
                         Button("Backups", systemImage: "clock.arrow.circlepath") { store.showBackups = true }
                             .help("Back up or restore this keyboard's keymap")
@@ -34,6 +40,7 @@ struct KeyboardDetailView: View {
             }
             .task { await session.loadIfNeeded() }
             .sheet(isPresented: $store.showBackups) { BackupsView(session: session) }
+            .sheet(isPresented: $store.showMacros) { MacrosView(session: session) }
             .sheet(isPresented: $store.showSharing) {
                 if let account = store.account { SharingSheet(session: session, account: account) }
             }

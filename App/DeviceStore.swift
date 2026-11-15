@@ -78,6 +78,8 @@ final class KeyboardSession: Identifiable {
     var protocolVersion = 0
     var layerCount = 0
     var keymap: [[UInt16]] = []
+    var macros: [[MacroStep]]?      // nil until read, or if the keyboard can't store macros
+    var macroBufferSize = 0
     var layer = 0
     var selectedKey: Int?           // index into definition.keys
     var isBusy = false              // a write (or its backup prompt) is in flight
@@ -142,6 +144,9 @@ final class KeyboardSession: Identifiable {
             self.definition = definition
             keymap = try await client.readKeymap(layers: layerCount, rows: definition.rows, cols: definition.cols)
             layer = min(layer, layerCount - 1)
+            if protocolVersion >= Macros.minimumProtocol, let read = try? await client.readMacros(), !read.macros.isEmpty {
+                (macros, macroBufferSize) = (read.macros, read.bufferSize)
+            }
             phase = .ready
         } catch {
             phase = .failed(error.localizedDescription)
@@ -184,6 +189,7 @@ final class DeviceStore {
     var showBackups = false
     var showImporter = false
     var showSharing = false
+    var showMacros = false
     var showInspector = true
 
     let backupManager: BackupManager
@@ -307,6 +313,13 @@ final class DeviceStore {
             session.saveCount += 1
         } else if session.writeError != nil {
             session.retryCode = code
+        }
+    }
+
+    func saveMacros(_ macros: [[MacroStep]], on session: KeyboardSession) async -> Bool {
+        await performWrite(on: session) {
+            try await session.client.writeMacros(macros)   // verifies by reading back
+            session.macros = macros
         }
     }
 
