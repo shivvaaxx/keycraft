@@ -59,11 +59,8 @@ Click a key, choose what it should do, and the change is on the keyboard a momen
 
 ## Install
 
-1. Download **[Keycraft.dmg](https://github.com/shivvaaxx/keycraft/releases/latest/download/Keycraft.dmg)**
-   and drag Keycraft to Applications.
-2. The first time you open it, macOS says it can't verify the developer, because Keycraft isn't
-   notarized by Apple yet. Open **System Settings ▸ Privacy & Security**, scroll down, and click
-   **Open Anyway** next to Keycraft. You only do this once.
+Download **[Keycraft.dmg](https://github.com/shivvaaxx/keycraft/releases/latest/download/Keycraft.dmg)**,
+open it, and drag Keycraft to Applications. It's signed and notarized by Apple, so it opens like any other app.
 
 Requires macOS 14 Sonoma or later, on Apple silicon or Intel.
 
