@@ -32,6 +32,8 @@ targets:
         CODE_SIGN_STYLE: Manual
         CODE_SIGN_IDENTITY: "-"
         ENABLE_HARDENED_RUNTIME: YES
+        # The on-device model is macOS 26+; weak-linked so Keycraft still launches on macOS 14 and 15.
+        OTHER_LDFLAGS: ["-weak_framework", "FoundationModels"]
 schemes:
   Keycraft:
     build:

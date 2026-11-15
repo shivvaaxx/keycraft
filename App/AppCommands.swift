@@ -14,6 +14,11 @@ struct AppCommands: Commands {
             Button("Load Layout File…") { store.showImporter = true }
                 .keyboardShortcut("o")
                 .disabled(session == nil)
+            Divider()
+            Button("Open QMK Code…") { openWindow(id: "qmk") }
+                .keyboardShortcut("o", modifiers: [.command, .shift])
+            Button("Export as QMK Code…") { if let session { QMKExport.save(session) } }
+                .disabled(!ready)
             if store.account != nil {
                 Button("Share Keyboard Layout…") { store.showSharing = true }
                     .disabled(session.map { !store.canShare($0) } ?? true)

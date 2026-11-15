@@ -12,6 +12,7 @@ enum DebugHooks {
         case "light": NSApp.appearance = NSAppearance(named: .aqua)
         default: break
         }
+        if env["KEYCRAFT_OPEN"] == "qmk" { store.selectDemo() }   // so the opened file has a keyboard to be drawn on
         if env["KEYCRAFT_OPEN"] == "sharing" {   // the Sharing sheet on the Demo Keyboard (it can't really be shared)
             store.selectDemo()
             try? await Task.sleep(for: .seconds(1))
@@ -30,7 +31,7 @@ enum DebugHooks {
     }
 }
 
-/// Debug builds only: `KEYCRAFT_OPEN=library|settings|sharing` opens that window or sheet at launch (for screenshots).
+/// Debug builds only: `KEYCRAFT_OPEN=library|settings|sharing|qmk` opens that window or sheet at launch (for screenshots).
 struct DebugOpenWindow: ViewModifier {
     @Environment(\.openWindow) private var openWindow
     @Environment(\.openSettings) private var openSettings
@@ -40,6 +41,7 @@ struct DebugOpenWindow: ViewModifier {
             #if DEBUG
             switch ProcessInfo.processInfo.environment["KEYCRAFT_OPEN"] {
             case "library": openWindow(id: "library")
+            case "qmk": openWindow(id: "qmk")   // with KEYCRAFT_QMK_FILE=<path> to open a keymap.c
             case "settings": openSettings()
             default: break
             }

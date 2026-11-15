@@ -21,6 +21,11 @@ struct KeycraftApp: App {
         }
         .defaultSize(width: 560, height: 640)
 
+        Window("QMK Code", id: "qmk") {
+            QMKCodeView().environment(store)
+        }
+        .defaultSize(width: 820, height: 640)
+
         Settings {
             SettingsView().environment(store)
         }
