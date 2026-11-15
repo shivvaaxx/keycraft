@@ -69,6 +69,8 @@ Requires macOS 14 Sonoma or later, on Apple silicon or Intel.
 
 ## Supported keyboards
 
+<img src="docs/images/library.png" align="right" width="280" alt="The Keyboard Library window listing 2,032 keyboards">
+
 Keycraft works with keyboards running **QMK firmware with VIA turned on**, which covers most custom and
 enthusiast keyboards (Keychron, GMMK Pro, Drop, KBDfans and hundreds more). See
 [`keyboards/`](https://github.com/shivvaaxx/keycraft-keyboards/tree/main/keyboards) for the full list.
