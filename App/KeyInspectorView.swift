@@ -21,6 +21,7 @@ struct KeyInspectorView: View {
             if let position {
                 VStack(alignment: .leading, spacing: 0) {
                     header(position: position)
+                    holdPicker(code: session.keymap[session.layer][position])
                     Divider()
                     search
                     keyList(currentCode: session.keymap[session.layer][position])
@@ -69,9 +70,56 @@ struct KeyInspectorView: View {
                         .help("Send the change to the keyboard again")
                 }
             }
-        } else if showSaved {
+        } else {
+            // Always laid out, only faded: the list below must not jump when the confirmation comes and goes.
             Label("Saved to keyboard", systemImage: "checkmark.circle.fill")
                 .font(.callout).foregroundStyle(.green)
+                .opacity(showSaved ? 1 : 0)
+                .accessibilityHidden(!showSaved)
+        }
+    }
+
+    // MARK: When held (mod-tap / layer-tap)
+
+    /// Tap/hold needs v2 keycodes and a basic tap key; mod-tap and layer-tap only carry an 8-bit key.
+    private func tapPart(_ code: UInt16) -> (tap: UInt16, hold: Keycode.Hold?)? {
+        guard session.protocolVersion >= VIAProtocol.keycodesV2 else { return nil }
+        if let split = Keycode.tapHold(code, protocolVersion: session.protocolVersion) { return (split.tap, split.hold) }
+        return (0x04...0xFF).contains(code) ? (code, nil) : nil
+    }
+
+    @ViewBuilder private func holdPicker(code: UInt16) -> some View {
+        if let (tap, hold) = tapPart(code) {
+            let binding = Binding<Keycode.Hold?>(
+                get: { hold },
+                set: { new in Task { await store.assign(new.map { Keycode.tapHold(tap: tap, hold: $0) } ?? tap, on: session) } })
+            HStack {
+                Picker("When Held", selection: binding) {
+                    Text("Nothing").tag(Keycode.Hold?.none)
+                    Section("Modifier") {
+                        ForEach([(Keycode.Modifier.control, "Control"), (Keycode.Modifier.option, "Option"),
+                                 (Keycode.Modifier.shift, "Shift"), (Keycode.Modifier.command, "Command"),
+                                 (Keycode.Modifier.hyper, "Hyper (⌃⌥⇧⌘)"), (Keycode.Modifier.meh, "Meh (⌃⌥⇧)")], id: \.0) { m, name in
+                            Text(name).tag(Keycode.Hold?.some(.modifiers(m)))
+                        }
+                    }
+                    // Layer-tap encodes layers 0-15.
+                    if session.layerCount > 1 {
+                        Section("Layer") {
+                            ForEach(1..<min(session.layerCount, 16), id: \.self) { n in
+                                Text(Keycode.layerName(n)).tag(Keycode.Hold?.some(.layer(n)))
+                            }
+                        }
+                    }
+                }
+                .pickerStyle(.menu)
+                .fixedSize()
+                .disabled(session.isBusy)
+                .help("Make this key do something else while you hold it down")
+                Spacer()
+            }
+            .padding(.horizontal, 16)
+            .padding(.bottom, 12)
         }
     }
 
@@ -104,23 +152,26 @@ struct KeyInspectorView: View {
     }
 
     private func keyList(currentCode: UInt16) -> some View {
-        List {
+        // On a tap/hold key the list picks the tap half, keeping the hold.
+        let split = tapPart(currentCode)
+        let current = split?.tap ?? currentCode
+        func choose(_ code: UInt16) {
+            let new = if let hold = split?.hold, (0x04...0xFF).contains(code) { Keycode.tapHold(tap: code, hold: hold) } else { code }
+            Task { await store.assign(new, on: session) }
+        }
+        return List {
             ForEach(groups) { group in
                 Section {
                     if group.isPlain {
                         LazyVGrid(columns: [GridItem(.adaptive(minimum: 40), spacing: 6)], spacing: 6) {
                             ForEach(group.keycodes) { key in
-                                KeycodeChip(info: key, isCurrent: key.code == currentCode) {
-                                    Task { await store.assign(key.code, on: session) }
-                                }
+                                KeycodeChip(info: key, isCurrent: key.code == current) { choose(key.code) }
                             }
                         }
                         .padding(.vertical, 4)
                     } else {
                         ForEach(group.keycodes) { key in
-                            KeycodeRow(info: key, isCurrent: key.code == currentCode) {
-                                Task { await store.assign(key.code, on: session) }
-                            }
+                            KeycodeRow(info: key, isCurrent: key.code == current) { choose(key.code) }
                         }
                     }
                 } header: {

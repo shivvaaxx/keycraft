@@ -43,6 +43,7 @@ public enum Keycode {
             for (base, kind) in [(UInt16(0x5200), LayerKind.to), (0x5220, .momentary), (0x5260, .toggle)] where (base...base + 0x1F).contains(code) {
                 return layerInfo(kind, Int(code - base))
             }
+            if let composite = compositeInfo(code) { return composite }
         }
         let hex = String(format: "0x%04X", code)
         return KeycodeInfo(code: code, label: hex, name: "Custom code \(hex)", description: "Set by the keyboard's firmware")
@@ -80,7 +81,8 @@ public enum Keycode {
                   [0x28, 0x29, 0x2A, 0x4C, 0x2B, 0x2C, 0x39, 0x49, 0x65, 0x7A, 0x7B, 0x7C, 0x7D, 0x7E]),
             group("Navigation", "Move the cursor or scroll through a document.", [0x52, 0x51, 0x50, 0x4F, 0x4A, 0x4D, 0x4B, 0x4E]),
             group("Function Keys", "F1 to F24. Apps and macOS decide what these do.", range(0x3A...0x45) + range(0x68...0x73), plain: true),
-            group("Modifiers", "Hold one of these while pressing another key to make shortcuts.", range(0xE0...0xE7)),
+            group("Modifiers", "Hold one of these while pressing another key to make shortcuts.",
+                  range(0xE0...0xE7) + (protocolVersion >= VIAProtocol.keycodesV2 ? [withModifiers(Modifier.hyper), withModifiers(Modifier.meh)] : [])),
             group("Media & System", "Volume, playback, brightness and other controls that work across the whole Mac.",
                   range(0xA8...0xB0) + [0xBB, 0xBC, 0xBD, 0xBE, 0xC1, 0xC2, 0xC0, 0xA5, 0xA6, 0xA7, 0x46, 0x47, 0x48]
                   + [0xB1, 0xB2, 0xB3, 0xB4, 0xB5, 0xB6, 0xB7, 0xB8, 0xB9, 0xBA, 0xBF]),
@@ -89,9 +91,107 @@ public enum Keycode {
         if protocolVersion >= VIAProtocol.keycodesV2 {
             let layers = (0..<min(max(layerCount, 0), 32)).flatMap { [momentary($0), to($0), toggle($0)] }
             groups.append(group("Layers", "Layers hold extra sets of keys. Use these to move between them.", layers))
+            let oneShot = [Modifier.control, Modifier.shift, Modifier.option, Modifier.command].map(oneShotModifier)
+                + (1..<min(max(layerCount, 0), 32)).map(oneShotLayer)
+            groups.append(group("One-Shot", "Tap once and it applies to the next key you press, so you don't have to hold it.", oneShot))
         }
         groups.append(group("Special", "Keys that do nothing themselves.", [none, transparent]))
         return groups
+    }
+
+    // MARK: Tap/hold and modifier combinations (QMK v2 keycodes.h: QK_MODS 0x0100, QK_MOD_TAP 0x2000,
+    // QK_LAYER_TAP 0x4000, QK_ONE_SHOT_LAYER 0x5280, QK_ONE_SHOT_MOD 0x52A0). Modifier bits are QMK's 5-bit
+    // mod mask: Ctrl 0x01, Shift 0x02, Alt 0x04, GUI 0x08, 0x10 = right-hand side.
+
+    public enum Modifier {
+        public static let control: UInt8 = 0x01, shift: UInt8 = 0x02, option: UInt8 = 0x04, command: UInt8 = 0x08
+        public static let right: UInt8 = 0x10
+        /// Control, Option, Shift and Command together: a chord no app uses, so it's free for your own shortcuts.
+        public static let hyper: UInt8 = 0x0F
+        /// Control, Option and Shift together.
+        public static let meh: UInt8 = 0x07
+    }
+
+    /// What a tap/hold key does when held.
+    public enum Hold: Hashable, Sendable {
+        case modifiers(UInt8)
+        case layer(Int)
+    }
+
+    /// The tap and hold halves of a mod-tap or layer-tap key; nil for anything else.
+    public static func tapHold(_ code: UInt16, protocolVersion: Int = VIAProtocol.keycodesV2) -> (tap: UInt16, hold: Hold)? {
+        guard protocolVersion >= VIAProtocol.keycodesV2 else { return nil }
+        switch code {
+        case 0x2000...0x3FFF: return (code & 0xFF, .modifiers(UInt8((code >> 8) & 0x1F)))
+        case 0x4000...0x4FFF: return (code & 0xFF, .layer(Int((code >> 8) & 0x0F)))
+        default: return nil
+        }
+    }
+
+    /// Tap sends `tap` (a basic key, 0x04-0xFF); hold acts as `hold`. Layer-tap reaches layers 0-15 only.
+    public static func tapHold(tap: UInt16, hold: Hold) -> UInt16 {
+        switch hold {
+        case .modifiers(let m): 0x2000 | UInt16(m & 0x1F) << 8 | (tap & 0xFF)
+        case .layer(let n): 0x4000 | UInt16(n & 0x0F) << 8 | (tap & 0xFF)
+        }
+    }
+
+    /// `key` sent with `modifiers` held, e.g. Command+C. With key 0 it's the modifiers alone (Hyper, Meh).
+    public static func withModifiers(_ modifiers: UInt8, key: UInt16 = 0) -> UInt16 { UInt16(modifiers & 0x1F) << 8 | (key & 0xFF) }
+    public static func oneShotModifier(_ modifiers: UInt8) -> UInt16 { 0x52A0 | UInt16(modifiers & 0x1F) }
+    public static func oneShotLayer(_ layer: Int) -> UInt16 { 0x5280 | UInt16(layer & 0x1F) }
+
+    /// Mac names in Apple's order (Control, Option, Shift, Command), or Hyper/Meh for those chords.
+    public static func modifierNames(_ m: UInt8) -> (symbols: String, name: String) {
+        let side = m & Modifier.right != 0 ? "Right " : ""
+        switch m & 0x0F {
+        case Modifier.hyper: return ("✦", side + "Hyper")
+        case Modifier.meh: return ("◆", side + "Meh")
+        default:
+            let parts = [(Modifier.control, "⌃", "Control"), (Modifier.option, "⌥", "Option"),
+                         (Modifier.shift, "⇧", "Shift"), (Modifier.command, "⌘", "Command")].filter { m & $0.0 != 0 }
+            return (parts.map(\.1).joined(), side + parts.map(\.2).joined(separator: "+"))
+        }
+    }
+
+    private static func compositeInfo(_ code: UInt16) -> KeycodeInfo? {
+        func tapName(_ c: UInt16) -> (label: String, name: String) {
+            let t = table[c & 0xFF]
+            return (t?.label ?? "?", t?.name ?? String(format: "0x%02X", c & 0xFF))
+        }
+        if let (tap, hold) = tapHold(code) {
+            let t = tapName(tap)
+            let (holdLabel, holdName): (String, String) = switch hold {
+            case .modifiers(let m): (modifierNames(m).symbols, modifierNames(m).name)
+            case .layer(let n): (n == 0 ? "Base" : "L\(n)", layerName(n))
+            }
+            return KeycodeInfo(code: code, label: "\(t.label)/\(holdLabel)", name: "\(t.name), hold for \(holdName)",
+                               description: "Tap for \(t.name), hold for \(holdName)")
+        }
+        switch code {
+        case 0x0100...0x1FFF:
+            let mods = modifierNames(UInt8(code >> 8))
+            guard code & 0xFF != 0 else {
+                let description = switch UInt8((code >> 8) & 0x0F) {
+                case Modifier.hyper: "Holds Control, Option, Shift and Command; free for your own shortcuts"
+                case Modifier.meh: "Holds Control, Option and Shift; free for your own shortcuts"
+                default: "Holds \(mods.name)"
+                }
+                return KeycodeInfo(code: code, label: mods.symbols, name: mods.name, description: description)
+            }
+            let t = tapName(code)
+            return KeycodeInfo(code: code, label: mods.symbols + t.label, name: "\(mods.name)+\(t.name)",
+                               description: "Sends \(t.name) with \(mods.name) held")
+        case 0x5280...0x529F:
+            let layer = layerName(Int(code - 0x5280))
+            return KeycodeInfo(code: code, label: "OS \(code == 0x5280 ? "Base" : "L\(code - 0x5280)")", name: "One-Shot \(layer)",
+                               description: "\(layer) applies to the next key you press")
+        case 0x52A0...0x52BF:
+            let mods = modifierNames(UInt8(code - 0x52A0))
+            return KeycodeInfo(code: code, label: "OS " + mods.symbols, name: "One-Shot \(mods.name)",
+                               description: "\(mods.name) applies to the next key, no need to hold it")
+        default: return nil
+        }
     }
 
     // MARK: Layer keys

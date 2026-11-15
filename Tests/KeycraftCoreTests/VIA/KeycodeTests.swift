@@ -60,7 +60,7 @@ import Testing
     @Test func catalogueGroupsAndLayerLimit() {
         let groups = Keycode.catalogue(layerCount: 3)
         #expect(groups.map(\.title) == ["Letters & Numbers", "Symbols", "Editing", "Navigation", "Function Keys", "Modifiers",
-                                        "Media & System", "Keypad", "Layers", "Special"])
+                                        "Media & System", "Keypad", "Layers", "One-Shot", "Special"])
         #expect(groups.dropFirst().allSatisfy { !$0.footer.isEmpty })   // letters need no footer
         #expect([0x04, 0x28, 0xA9, 0xE3].allSatisfy { !Keycode.needsExplanation($0) })      // A, Enter, Volume Up, Command
         #expect([0x00, 0x01, 0x46, Keycode.momentary(1), Keycode.qkKB].allSatisfy(Keycode.needsExplanation))
@@ -84,5 +84,23 @@ import Testing
             #expect(!k.name.hasPrefix("Custom code"), "code \(k.code) fell back to a custom code")
         }
         #expect(Set(catalogue.map(\.code)).count == catalogue.count)   // no code listed twice
+    }
+
+    @Test func tapHoldMatchesQMKEncoding() {
+        // keycodes.h: MT(MOD_LCTL, KC_A) = 0x2104, LT(1, KC_ESC) = 0x4129, LGUI(KC_C) = 0x0806, OSM(MOD_LSFT) = 0x52A2.
+        #expect(Keycode.tapHold(tap: 0x04, hold: .modifiers(Keycode.Modifier.control)) == 0x2104)
+        #expect(Keycode.tapHold(tap: 0x29, hold: .layer(1)) == 0x4129)
+        #expect(Keycode.withModifiers(Keycode.Modifier.command, key: 0x06) == 0x0806)
+        #expect(Keycode.oneShotModifier(Keycode.Modifier.shift) == 0x52A2 && Keycode.oneShotLayer(2) == 0x5282)
+        #expect(Keycode.tapHold(0x2104)! == (0x04, .modifiers(0x01)) && Keycode.tapHold(0x4129)! == (0x29, .layer(1)))
+        #expect(Keycode.tapHold(0x2104, protocolVersion: 11) == nil && Keycode.tapHold(0x5220) == nil)
+
+        #expect(Keycode.info(0x2104).name == "A, hold for Control" && Keycode.info(0x2104).label == "A/⌃")
+        #expect(Keycode.info(0x4129).name == "Escape, hold for Layer 1")
+        #expect(Keycode.info(0x0806).name == "Command+C" && Keycode.info(0x0806).label == "⌘C")
+        #expect(Keycode.info(0x0F00).name == "Hyper" && Keycode.info(0x0700).name == "Meh")
+        #expect(Keycode.info(0x1200).name == "Right Shift")
+        #expect(Keycode.info(0x52A2).name == "One-Shot Shift" && Keycode.info(0x5281).name == "One-Shot Layer 1")
+        #expect(Keycode.info(0x2F04).name == "A, hold for Hyper")
     }
 }
