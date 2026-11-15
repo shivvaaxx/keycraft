@@ -80,6 +80,8 @@ public actor VIAClient {
         let version = try await protocolVersion()
         var bytes: [UInt8] = []
         let total = layers * rows * cols * 2
+        // Buffer reads take a 16-bit offset; a larger keymap can't be addressed (and UInt8(offset >> 8) would trap).
+        guard total > 0, total <= 0x10000 else { throw VIAError.invalidKeymapSize(expected: total, actual: 0x10000) }
         bytes.reserveCapacity(total)
         if version >= VIAProtocol.beta {
             while bytes.count < total {

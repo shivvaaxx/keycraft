@@ -1,3 +1,4 @@
+import KeycraftCore
 import SwiftUI
 
 /// Menu bar: every command is reachable here. File, Keyboard and Help are Keycraft's own; the library opens from Window.
@@ -53,6 +54,10 @@ struct AppCommands: Commands {
         }
         CommandGroup(replacing: .help) {
             Button("Keycraft Help") { Help.openReadme() }
+            Divider()
+            // Keycraft is free; these open the donation pages in the browser.
+            Button("Support Keycraft on Ko-fi…") { NSWorkspace.shared.open(KeycraftConfig.koFiURL) }
+            Button("Sponsor Keycraft on GitHub…") { NSWorkspace.shared.open(KeycraftConfig.githubSponsorsURL) }
         }
     }
 

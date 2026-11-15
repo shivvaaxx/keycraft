@@ -8,4 +8,7 @@ public enum KeycraftConfig {
     public static let databaseRepo: (owner: String, name: String)? = (owner: "shivvaaxx", name: "keycraft-keyboards")
     /// Public client ID of Keycraft's GitHub OAuth App (device flow). There is deliberately no client secret.
     public static let githubClientID: String? = "Ov23li0k38TEcp6DAb59"
+    /// Donation pages (Help menu, README, the repos' Sponsor button).
+    public static let koFiURL = URL(string: "https://ko-fi.com/shivvaaxx")!
+    public static let githubSponsorsURL = URL(string: "https://github.com/sponsors/shivvaaxx")!
 }

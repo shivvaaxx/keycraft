@@ -7,6 +7,12 @@ import Testing
         def.keys.first { $0.row == row && $0.col == col }
     }
 
+    @Test(arguments: [(0, 2), (-1, 2), (2, -5), (256, 2), (2, 1000)])
+    func rejectsMatrixOutsideByteRange(rows: Int, cols: Int) {
+        let json = #"{"name":"Bad","vendorId":"0x1234","productId":"0x5678","matrix":{"rows":\#(rows),"cols":\#(cols)},"layouts":{"keymap":[["0,0"]]}}"#
+        #expect(throws: DecodingError.self) { try VIADefinition(data: Data(json.utf8)) }
+    }
+
     @Test func gh60() throws {
         let def = try VIADefinition(data: fixture("v3_gh60_satan_satan.json"))
         #expect(def.name == "GH60 Satan")

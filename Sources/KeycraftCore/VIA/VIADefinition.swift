@@ -115,6 +115,12 @@ public struct VIADefinition: Sendable, Decodable {
         vendorID = try hex(.vendorId)
         productID = try hex(.productId)
         let matrix = try c.decode(Matrix.self, forKey: .matrix)
+        // VIA addresses rows and columns as single bytes. Layout files are untrusted (imported or downloaded),
+        // and anything outside 1...255 would trap later (negative ranges, UInt8 conversions).
+        guard (1...255).contains(matrix.rows), (1...255).contains(matrix.cols) else {
+            throw DecodingError.dataCorruptedError(forKey: .matrix, in: c,
+                debugDescription: "Matrix must have 1–255 rows and columns (found \(matrix.rows)×\(matrix.cols)).")
+        }
         (rows, cols) = (matrix.rows, matrix.cols)
         let layouts = try c.decode(Layouts.self, forKey: .layouts)
         optionTitles = (layouts.labels ?? []).map(\.titleText)

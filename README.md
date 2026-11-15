@@ -4,6 +4,14 @@ Free, open-source (GPL-3.0) native macOS app that configures keyboards live over
 speaks the VIA protocol (QMK) and includes a built-in Demo Keyboard, so it works with no hardware.
 Keyboards are detected automatically (hot-plug): no pairing, no permission picker, no browser.
 
+## Support Keycraft
+Keycraft is free and always will be. If it saves you a trip to a browser configurator, you can help keep it going:
+
+[![Ko-fi](https://img.shields.io/badge/Ko--fi-Support%20Keycraft-FF5E5B?logo=ko-fi&logoColor=white)](https://ko-fi.com/shivvaaxx)
+[![GitHub Sponsors](https://img.shields.io/badge/GitHub%20Sponsors-Sponsor-EA4AAA?logo=githubsponsors&logoColor=white)](https://github.com/sponsors/shivvaaxx)
+
+Both links are also in the app under Help.
+
 ## Build
 ```
 swift build && swift test          # core library + tests
