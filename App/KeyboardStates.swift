@@ -38,7 +38,7 @@ struct KeyboardStateView: View {
             } actions: {
                 Button("Try Again") { Task { await session.load() } }
                     .help("Ask the keyboard again")
-                Button("Learn More") { Help.openReadme() }
+                Button("Learn More") { Help.openReadme(section: "turning-on-via") }
                     .help("How to turn on live editing in your keyboard's firmware")
             }
         case .noDefinition:
@@ -68,8 +68,8 @@ struct KeyboardStateView: View {
 }
 
 enum Help {
-    /// The README ships inside the app; "Keycraft Help" and "Learn More" open it.
-    static func openReadme() {
-        if let url = Bundle.main.url(forResource: "README", withExtension: "md") { NSWorkspace.shared.open(url) }
+    /// "Keycraft Help" opens the README on GitHub; "Learn More" jumps to its section on turning on VIA.
+    static func openReadme(section: String? = nil) {
+        NSWorkspace.shared.open(URL(string: "https://github.com/shivvaaxx/keycraft#\(section ?? "readme")")!)
     }
 }

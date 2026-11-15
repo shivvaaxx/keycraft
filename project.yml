@@ -18,8 +18,6 @@ targets:
     sources:
       - path: App
         excludes: ["Info.plist", "Keycraft.entitlements"]
-      - path: README.md
-        buildPhase: resources
     dependencies:
       - package: KeycraftCore
         product: KeycraftCore
