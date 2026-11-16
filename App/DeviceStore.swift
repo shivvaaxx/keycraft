@@ -180,8 +180,12 @@ struct BackupWarning: Identifiable {
 final class DeviceStore {
     private(set) var sessions: [KeyboardSession] = []      // real keyboards
     let libraries = LibraryProvider()
-    /// Nil when this build can't share (no GitHub configuration): every Share control is then hidden.
+    /// Nil when this build has no GitHub configuration: sharing then has no sign-in option.
     let account = GitHubAccount()
+    /// Sharing without an account, through thistleware.com. Nil when this build has no share endpoint.
+    let anonymous = AnonymousSharing(appVersion: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "dev")
+    /// False when neither way of sharing is configured: every Share control is then hidden.
+    var sharingAvailable: Bool { account != nil || anonymous != nil }
     private(set) var demo: KeyboardSession
     var selectedID: String?
     var warning: BackupWarning?
@@ -230,7 +234,7 @@ final class DeviceStore {
 
     /// Only a layout file the user loaded for a keyboard the database doesn't have can be shared.
     func canShare(_ session: KeyboardSession) -> Bool {
-        guard account != nil, !session.isDemo, session.isReady, let library = libraries.library else { return false }
+        guard sharingAvailable, !session.isDemo, session.isReady, let library = libraries.library else { return false }
         let (vid, pid) = (session.info.vendorID, session.info.productID)
         return library.entry(vendorID: vid, productID: pid)?.source == .imported && !library.databaseContains(vendorID: vid, productID: pid)
     }

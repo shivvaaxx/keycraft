@@ -14,10 +14,14 @@ final class GitHubAccount {
     private(set) var signIn = SignIn.idle
     @ObservationIgnored private var task: Task<Void, Never>?
 
-    /// Nil when this build has no GitHub configuration: every Share control is then hidden.
+    /// Nil when this build has no GitHub configuration: sharing then has no sign-in option.
     init?() {
         let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "dev"
-        guard let sharing = GitHubSharing(appVersion: version) else { return nil }
+        var tokens: any GitHubTokenStore = KeychainTokenStore()
+        #if DEBUG   // KEYCRAFT_GITHUB_SERVICE=<name>: a separate Keychain item, to see the signed-out sheet without signing out
+        if let service = ProcessInfo.processInfo.environment["KEYCRAFT_GITHUB_SERVICE"] { tokens = KeychainTokenStore(service: service) }
+        #endif
+        guard let sharing = GitHubSharing(tokens: tokens, appVersion: version) else { return nil }
         self.sharing = sharing
     }
 
@@ -74,7 +78,7 @@ struct GitHubSignInView: View {
         VStack(alignment: .leading, spacing: 12) {
             switch account.signIn {
             case .idle, .failed:
-                Text("Keycraft sends your layout through your GitHub account. You approve access on github.com, so Keycraft never sees your password.")
+                Text("Sign in to have the pull request opened under your GitHub name. You approve access on github.com, so Keycraft never sees your password.")
                     .foregroundStyle(.secondary)
                 if case .failed(let message) = account.signIn {
                     Text(message).foregroundStyle(.red)
@@ -111,17 +115,22 @@ struct GitHubSignInView: View {
     }
 }
 
-/// The sheet behind File ▸ Share Keyboard Layout…: what will be shared, sign in if needed, then send.
+/// The sheet behind File ▸ Share Keyboard Layout…: what will be shared, then send. Signed in to GitHub, the pull request
+/// is the user's own; otherwise it goes through thistleware.com and its bot opens it.
 struct SharingSheet: View {
     let session: KeyboardSession
-    let account: GitHubAccount
+    let account: GitHubAccount?
+    let anonymous: AnonymousSharing?
     @Environment(DeviceStore.self) private var store
     @Environment(\.dismiss) private var dismiss
 
-    private enum Stage: Equatable { case form, sharing(String), shared(URL), failed(String) }
+    private enum Stage: Equatable { case form, sharing(String), shared(URL, alreadyShared: Bool), failed(String) }
     @State private var stage = Stage.form
     @State private var name = ""
     @State private var maker = ""
+    @State private var showSignIn = false
+
+    private var signedIn: Bool { account?.isSignedIn ?? false }
 
     private var raw: Data? { store.libraries.library?.rawDefinition(vendorID: session.info.vendorID, productID: session.info.productID) }
     private var submission: Result<Submission, SharingError> {
@@ -137,9 +146,13 @@ struct SharingSheet: View {
             case .form: form
             case .sharing(let text):
                 ProgressView(text).frame(maxWidth: .infinity, minHeight: 120)
-            case .shared(let url):
+            case .shared(let url, let alreadyShared):
                 VStack(alignment: .leading, spacing: 10) {
-                    Label("Shared. Maintainers will review it.", systemImage: "checkmark.circle.fill").foregroundStyle(.green)
+                    if alreadyShared {
+                        Label("Someone already shared this keyboard. Their layout is waiting for review.", systemImage: "clock")
+                    } else {
+                        Label("Shared. Maintainers will review it.", systemImage: "checkmark.circle.fill").foregroundStyle(.green)
+                    }
                     Link("View Pull Request", destination: url).help("Open the pull request on GitHub")
                 }
                 .frame(maxWidth: .infinity, minHeight: 80, alignment: .leading)
@@ -158,7 +171,7 @@ struct SharingSheet: View {
                     Button("Cancel") { dismiss() }.keyboardShortcut(.cancelAction)
                 case .form:
                     Button("Cancel") { dismiss() }.keyboardShortcut(.cancelAction)
-                    if account.isSignedIn {
+                    if signedIn || anonymous != nil {
                         Button("Share") { share() }
                             .keyboardShortcut(.defaultAction)
                             .disabled({ if case .failure = submission { true } else { false } }())
@@ -170,7 +183,7 @@ struct SharingSheet: View {
         .padding(20)
         .frame(width: 460)
         .onAppear {
-            account.refresh()
+            account?.refresh()
             name = session.definition?.name ?? session.displayName
             maker = session.maker ?? ""
         }
@@ -192,12 +205,23 @@ struct SharingSheet: View {
         if case .failure(let error) = submission {
             Text(error.localizedDescription).font(.callout).foregroundStyle(.secondary)
         }
-        Text("Only the layout file is shared — nothing about your keymap or this Mac.")
-            .font(.callout).foregroundStyle(.secondary)
-        if account.isSignedIn {
+        if let account, account.isSignedIn {
+            Text("Only the layout file is shared — nothing about your keymap or this Mac.")
+                .font(.callout).foregroundStyle(.secondary)
             Label("Signed in to GitHub" + (account.login.map { " as \($0)" } ?? ""), systemImage: "person.crop.circle.badge.checkmark")
                 .font(.callout).foregroundStyle(.secondary)
-        } else {
+        } else if anonymous != nil {
+            Text("Only the layout file is shared — nothing about your keymap. It goes through thistleware.com, which keeps a one-way hash of your IP address for an hour to limit spam.")
+                .font(.callout).foregroundStyle(.secondary)
+            if let account {
+                DisclosureGroup("Get credit on GitHub (optional)", isExpanded: $showSignIn) {
+                    GitHubSignInView(account: account).padding(.top, 6)
+                }
+                .font(.callout)
+            }
+        } else if let account {
+            Text("Only the layout file is shared — nothing about your keymap or this Mac.")
+                .font(.callout).foregroundStyle(.secondary)
             GitHubSignInView(account: account)
         }
     }
@@ -207,10 +231,15 @@ struct SharingSheet: View {
         stage = .sharing("Creating pull request…")
         Task {
             do {
-                let url = try await account.sharing.share(submission) { text in Task { @MainActor in if case .sharing = stage { stage = .sharing(text) } } }
-                stage = .shared(url)
+                if let account, account.isSignedIn {
+                    let url = try await account.sharing.share(submission) { text in Task { @MainActor in if case .sharing = stage { stage = .sharing(text) } } }
+                    stage = .shared(url, alreadyShared: false)
+                } else if let anonymous {
+                    let shared = try await anonymous.share(submission)
+                    stage = .shared(shared.url, alreadyShared: shared.alreadyShared)
+                }
             } catch {
-                account.refresh()   // a rejected token signs the user out
+                account?.refresh()   // a rejected token signs the user out
                 stage = .failed(error.localizedDescription)
             }
         }

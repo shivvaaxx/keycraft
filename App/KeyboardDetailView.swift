@@ -42,7 +42,7 @@ struct KeyboardDetailView: View {
             .sheet(isPresented: $store.showBackups) { BackupsView(session: session) }
             .sheet(isPresented: $store.showMacros) { MacrosView(session: session) }
             .sheet(isPresented: $store.showSharing) {
-                if let account = store.account { SharingSheet(session: session, account: account) }
+                if store.sharingAvailable { SharingSheet(session: session, account: store.account, anonymous: store.anonymous) }
             }
             .fileImporter(isPresented: $store.showImporter, allowedContentTypes: [.json]) { result in
                 if case .success(let url) = result { Task { await session.importDefinition(url) } }

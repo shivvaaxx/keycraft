@@ -6,6 +6,7 @@ public enum SharingError: LocalizedError, Equatable {
     case invalid([String])
     case github(status: Int, message: String)
     case forkNotReady
+    case service(status: Int, message: String)
 
     public var errorDescription: String? {
         switch self {
@@ -17,6 +18,7 @@ public enum SharingError: LocalizedError, Equatable {
         case .invalid(let problems): problems.joined(separator: "\n")
         case .github(let status, let message): "GitHub answered with an error (\(status)): \(message)"
         case .forkNotReady: "Your copy of the library on GitHub isn't ready yet. Try again in a minute."
+        case .service(_, let message): message
         }
     }
 }

@@ -87,7 +87,7 @@ private struct SharingSettingsPane: View {
                     GitHubSignInView(account: account)
                 }
             } footer: {
-                Text("Used only to send keyboard layouts to the shared library.")
+                Text("Optional. Layouts you share while signed in are sent under your GitHub name; without it they are shared anonymously.")
             }
         }
         .formStyle(.grouped)

@@ -19,7 +19,7 @@ struct AppCommands: Commands {
                 .keyboardShortcut("o", modifiers: [.command, .shift])
             Button("Export as QMK Code…") { if let session { QMKExport.save(session) } }
                 .disabled(!ready)
-            if store.account != nil {
+            if store.sharingAvailable {
                 Button("Share Keyboard Layout…") { store.showSharing = true }
                     .disabled(session.map { !store.canShare($0) } ?? true)
             }
