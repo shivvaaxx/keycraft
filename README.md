@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/shivvaaxx/keycraft/releases/latest/download/Keycraft.dmg"><img src="https://img.shields.io/badge/Download-Keycraft.dmg-5E5CE6?style=for-the-badge&logo=apple&logoColor=white" alt="Download Keycraft for macOS"></a>
+  <a href="#install"><img src="https://img.shields.io/badge/Get_Keycraft-%244.99-5E5CE6?style=for-the-badge&logo=apple&logoColor=white" alt="Get Keycraft for macOS, $4.99"></a>
 </p>
 
 <p align="center">
@@ -59,8 +59,8 @@ Click a key, choose what it should do, and the change is on the keyboard a momen
 
 ## Install
 
-Download **[Keycraft.dmg](https://github.com/shivvaaxx/keycraft/releases/latest/download/Keycraft.dmg)**,
-open it, and drag Keycraft to Applications. It's signed and notarized by Apple, so it opens like any other app.
+Keycraft is open source. The ready-to-use Mac app is $4.99.
+It's signed and notarized by Apple, so it opens like any other app.
 
 Requires macOS 14 Sonoma or later, on Apple silicon or Intel.
 
@@ -120,7 +120,7 @@ request on [keycraft-keyboards](https://github.com/shivvaaxx/keycraft-keyboards)
 
 ## Support Keycraft
 
-Keycraft is free and always will be. If it saved you a trip to a browser configurator, you can help keep it going:
+If Keycraft saved you a trip to a browser configurator, you can also leave a tip:
 
 <p>
   <a href="https://ko-fi.com/shivvaaxx"><img src="https://img.shields.io/badge/Ko--fi-Buy%20me%20a%20coffee-FF5E5B?style=for-the-badge&logo=ko-fi&logoColor=white" alt="Support on Ko-fi"></a>
