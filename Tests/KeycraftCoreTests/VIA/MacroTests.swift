@@ -29,6 +29,7 @@ import Testing
         #expect(Macros.decode([1, 9, 0x41], count: 1) == [[.text("A")]])   // unknown action skipped
         #expect(Macros.decode([1, 1, 0], count: 2) == [[], []])
         #expect(Macros.decode([1, 4, 0x35], count: 1) == [[.delay(5)]])
+        #expect(Macros.decode([1, 4] + Array(repeating: 0x39, count: 40), count: 1) == [[.delay(60_000)]])   // no overflow
     }
 
     @Test func simplifyMakesTapsAndText() {

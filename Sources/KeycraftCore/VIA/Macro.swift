@@ -41,7 +41,8 @@ public enum Macros {
                 switch action {
                 case .delay:
                     var ms = 0
-                    while i < buffer.count, (0x30...0x39).contains(buffer[i]) { ms = ms * 10 + Int(buffer[i] - 0x30); i += 1 }
+                    // Capped like the editor, so a keyboard sending endless digits can't overflow.
+                    while i < buffer.count, (0x30...0x39).contains(buffer[i]) { ms = min(ms * 10 + Int(buffer[i] - 0x30), 60_000); i += 1 }
                     if i < buffer.count, buffer[i] != 0 { i += 1 }   // the terminator ('|') is consumed by firmware too
                     steps.append(.delay(ms))
                 case .tap, .down, .up:
