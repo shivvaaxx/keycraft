@@ -10,8 +10,9 @@ ARCHIVE=build/Archive/Keycraft.xcarchive
 rm -rf build/Archive build/Upload build/Notarized build/dmg-stage build/Keycraft.dmg
 
 xcodegen generate
+# PAID_BUILD turns on the licence gate; open-source builds leave it off.
 xcodebuild -project Keycraft.xcodeproj -scheme Keycraft -configuration Release -archivePath $ARCHIVE archive \
-  DEVELOPMENT_TEAM=$TEAM CODE_SIGN_STYLE=Automatic CODE_SIGN_IDENTITY="Apple Development" -allowProvisioningUpdates
+  SWIFT_ACTIVE_COMPILATION_CONDITIONS='$(inherited) PAID_BUILD' DEVELOPMENT_TEAM=$TEAM CODE_SIGN_STYLE=Automatic CODE_SIGN_IDENTITY="Apple Development" -allowProvisioningUpdates
 
 cat > build/export.plist <<EOF
 <?xml version="1.0" encoding="UTF-8"?>

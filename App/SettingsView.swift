@@ -23,6 +23,10 @@ private struct GeneralSettingsPane: View {
     @Environment(DeviceStore.self) private var store
     @AppStorage("showDemoKeyboard") private var showDemo = true
     @AppStorage("checkForUpdates") private var checkForUpdates = true
+    #if PAID_BUILD
+    @Environment(LicenceState.self) private var licence
+    @State private var confirmDeactivate = false
+    #endif
 
     var body: some View {
         Form {
@@ -33,6 +37,18 @@ private struct GeneralSettingsPane: View {
             } footer: {
                 Text("The Demo Keyboard works without any hardware. Changes to it never leave this Mac.")
             }
+            #if PAID_BUILD
+            Section {
+                LabeledContent("Licensed to", value: licence.license?.email ?? "")
+                Button("Deactivate…") { confirmDeactivate = true }
+                    .help("Remove the licence key from this Mac")
+                    .confirmationDialog("Deactivate Keycraft on this Mac?", isPresented: $confirmDeactivate) {
+                        Button("Deactivate", role: .destructive) { licence.deactivate() }
+                    } message: {
+                        Text("You can activate again with your licence key.")
+                    }
+            }
+            #endif
             if store.libraries.canUpdate {
                 Section {
                     Toggle("Check for keyboard updates automatically", isOn: $checkForUpdates)
