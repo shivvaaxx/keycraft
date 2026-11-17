@@ -29,7 +29,7 @@ import Testing
         #expect(outcome.url.deletingLastPathComponent().lastPathComponent == "4335-0002-noserial")
     }
 
-    @Test func failingMacrosWarnsAboutMacrosAndFirmware() async throws {
+    @Test func failingMacrosWarnsAboutMacrosOnly() async throws {
         defer { try? FileManager.default.removeItem(at: dir) }
         let mock = MockVIADevice()
         mock.failCommands = [VIACommand.macroGetCount.rawValue]
@@ -39,14 +39,13 @@ import Testing
             asked.withLock { $0 = missing }; return true
         }
         let missing = asked.withLock { $0 }
-        #expect(missing.map(\.id) == ["macros", "firmware"])
+        #expect(missing.map(\.id) == ["macros"])   // firmware is optional: VIA can't read it and Keycraft never writes it
         #expect(missing[0].status == .failed && missing[0].reason?.isEmpty == false)
-        #expect(missing[1].status == .notSupported && missing[1].reason == "VIA keyboards can't read their firmware back over USB")
 
-        // Proceeding writes the file with the flag + missing ids; the keymap was still saved; lighting (optional) is not a prompt item.
+        // Proceeding writes the file with the flag + missing ids; the keymap was still saved; firmware and lighting (optional) are not prompt items.
         #expect(outcome.proceed)
         let file = try decode(outcome.url)
-        #expect(file.proceededWithoutFullBackup && file.missingItemIDs == ["macros", "firmware"])
+        #expect(file.proceededWithoutFullBackup && file.missingItemIDs == ["macros"])
         #expect(file.items.map(\.id) == ["keymap", "macros", "firmware", "lighting"])
         #expect(file.items.map(\.status) == [.saved, .failed, .notSupported, .notSupported])
         #expect(file.keymapData == Data(mock.keymapBytes))
@@ -54,11 +53,23 @@ import Testing
 
     @Test func cancelStillSavesTheBackupButDoesNotProceed() async throws {
         defer { try? FileManager.default.removeItem(at: dir) }
-        let items = VIAClient(transport: MockVIADevice()).backupItems(layers: 4, rows: 5, cols: 14)
+        let mock = MockVIADevice()
+        mock.failCommands = [VIACommand.macroGetCount.rawValue]
+        let items = VIAClient(transport: mock).backupItems(layers: 4, rows: 5, cols: 14)
         let outcome = try await manager.backUp(items: items, device: device) { _ in false }
         #expect(!outcome.proceed)
         let file = try decode(outcome.url)
-        #expect(!file.proceededWithoutFullBackup && file.missingItemIDs == ["firmware"])
+        #expect(!file.proceededWithoutFullBackup && file.missingItemIDs == ["macros"])
+    }
+
+    @Test func aHealthyKeyboardBacksUpWithoutAskingOrBeingIncomplete() async throws {
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let items = VIAClient(transport: MockVIADevice()).backupItems(layers: 4, rows: 5, cols: 14)
+        let asked = OSAllocatedUnfairLock(initialState: false)
+        let outcome = try await manager.backUp(items: items, device: device) { _ in asked.withLock { $0 = true }; return false }
+        #expect(outcome.proceed && outcome.missing.isEmpty && !asked.withLock { $0 })
+        let file = try decode(outcome.url)
+        #expect(!file.proceededWithoutFullBackup && file.missingItemIDs.isEmpty)
     }
 
     @Test func macrosAreBackedUpWithHeader() async throws {

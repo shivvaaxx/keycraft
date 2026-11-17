@@ -1,7 +1,7 @@
 import Foundation
 
-/// Decides when the "Unable to back up" alert appears. Items a keyboard can never back up (`.notSupported`,
-/// e.g. firmware) may be silenced per keyboard; failures (timeouts, errors) always warn.
+/// Decides when the "Unable to back up" alert appears. Important items a keyboard can never back up (`.notSupported`)
+/// may be silenced per keyboard; failures (timeouts, errors) always warn. Optional items, like firmware, never warn.
 // @unchecked Sendable: UserDefaults is documented as thread-safe.
 public struct BackupWarningPolicy: @unchecked Sendable {
     private let defaults: UserDefaults

@@ -210,7 +210,9 @@ public actor VIAClient {
                 let buffer = try await self.readMacroBuffer(size: size)
                 return Data([UInt8(count), UInt8(size >> 8), UInt8(size & 0xFF)] + buffer)
             },
-            BackupItem(id: "firmware", name: "Firmware image", importance: .important,
+            // Optional: VIA can't read firmware back, and Keycraft never writes firmware, so it isn't at risk.
+            // Marking it important made every backup "Incomplete" and warned before every keyboard's first change.
+            BackupItem(id: "firmware", name: "Firmware image", importance: .optional,
                        notSupportedReason: "VIA keyboards can't read their firmware back over USB") { nil },
             BackupItem(id: "lighting", name: "Lighting", importance: .optional,
                        notSupportedReason: "Not implemented yet") { nil },

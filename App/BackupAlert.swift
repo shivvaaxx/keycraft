@@ -2,7 +2,7 @@ import KeycraftCore
 import SwiftUI
 
 /// The system alert shown when something important couldn't be backed up. Cancel is the default (Return);
-/// "Don't warn again" appears only when every missing item is permanently unsupported (e.g. firmware).
+/// "Don't warn again" appears only when every missing item is permanently unsupported.
 /// `isActive` lets exactly one host present it, since a window can't show an alert over its own sheet.
 struct BackupAlert: ViewModifier {
     @Environment(DeviceStore.self) private var store
