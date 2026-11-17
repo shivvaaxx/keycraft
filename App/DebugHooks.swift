@@ -2,7 +2,7 @@ import AppKit
 import SwiftUI
 
 /// Debug-only launch switches for screenshots and manual checks (Debug builds only):
-/// `KEYCRAFT_APPEARANCE=dark|light`, `KEYCRAFT_SELECT_KEY=<index>`, `KEYCRAFT_LAYER=<n>`.
+/// `KEYCRAFT_APPEARANCE=dark|light`, `KEYCRAFT_SELECT_KEY=<index>`, `KEYCRAFT_LAYER=<n>`, `KEYCRAFT_HOVER=<hex keycode>` (key inspector).
 enum DebugHooks {
     @MainActor static func apply(_ store: DeviceStore) async {
         #if DEBUG

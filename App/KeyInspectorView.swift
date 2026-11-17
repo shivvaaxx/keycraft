@@ -8,6 +8,7 @@ struct KeyInspectorView: View {
     @Environment(DeviceStore.self) private var store
     @State private var query = ""
     @State private var showSaved = false
+    @State private var hoveredCode: UInt16?
     @FocusState private var searchFocused: Bool
 
     private var position: Int? {
@@ -163,60 +164,70 @@ struct KeyInspectorView: View {
         return List {
             ForEach(groups) { group in
                 Section {
-                    if group.isPlain {
-                        LazyVGrid(columns: [GridItem(.adaptive(minimum: 40), spacing: 6)], spacing: 6) {
-                            ForEach(group.keycodes) { key in
-                                KeycodeChip(info: key, isCurrent: key.code == current) { choose(key.code) }
-                            }
-                        }
-                        .padding(.vertical, 4)
-                    } else {
+                    ChipGrid(minimum: group.isPlain ? 40 : 56) {
                         ForEach(group.keycodes) { key in
-                            KeycodeRow(info: key, isCurrent: key.code == current) { choose(key.code) }
+                            KeycodeChip(info: key, isCurrent: key.code == current, action: { choose(key.code) }, onHover: { inside in
+                                if inside { hoveredCode = key.code } else if hoveredCode == key.code { hoveredCode = nil }
+                            })
                         }
                     }
+                    .padding(.vertical, 4)
                 } header: {
                     Text(group.title)
                 } footer: {
-                    if !group.footer.isEmpty { Text(group.footer).font(.caption) }
+                    if let info = group.keycodes.first(where: { $0.code == hoveredCode }) {
+                        Text(info.description.isEmpty ? info.name : "\(info.name): \(info.description)").font(.caption).lineLimit(2).fixedSize(horizontal: false, vertical: true)
+                    } else if !group.footer.isEmpty {
+                        Text(group.footer).font(.caption).lineLimit(2).fixedSize(horizontal: false, vertical: true)
+                    }
                 }
             }
         }
         .listStyle(.inset)
         .disabled(session.isBusy)
+        #if DEBUG
+        // Screenshots: `KEYCRAFT_HOVER=<hex keycode>` shows that key's explanation as if the pointer were over it.
+        .task { hoveredCode = ProcessInfo.processInfo.environment["KEYCRAFT_HOVER"].flatMap { UInt16($0, radix: 16) } ?? hoveredCode }
+        #endif
     }
 }
 
-private struct KeycodeRow: View {
-    let info: KeycodeInfo
-    let isCurrent: Bool
-    let action: () -> Void
+/// Equal-width columns that fill the width, like an adaptive LazyVGrid but laid out eagerly:
+/// a LazyVGrid inside a List section sometimes reserved its height and drew nothing (seen on Layers).
+private struct ChipGrid: Layout {
+    var minimum: CGFloat
+    var spacing: CGFloat = 6
 
-    var body: some View {
-        Button(action: action) {
-            HStack(alignment: .firstTextBaseline) {
-                VStack(alignment: .leading, spacing: 1) {
-                    Text(info.name)
-                    if Keycode.needsExplanation(info.code) {
-                        Text(info.description).font(.caption).foregroundStyle(.secondary).lineLimit(2)
-                    }
-                }
-                Spacer(minLength: 8)
-                if isCurrent { Image(systemName: "checkmark").foregroundStyle(Color.accentColor) }
-            }
-            .contentShape(Rectangle())
+    private func metrics(_ width: CGFloat, _ subviews: Subviews) -> (cols: Int, cell: CGFloat, height: CGFloat) {
+        let cols = max(1, Int((width + spacing) / (minimum + spacing)))
+        let cell = (width - spacing * CGFloat(cols - 1)) / CGFloat(cols)
+        let height = subviews.map { $0.sizeThatFits(ProposedViewSize(width: cell, height: nil)).height }.max() ?? 0
+        return (cols, cell, height)
+    }
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let width = proposal.width ?? minimum * 4 + spacing * 3
+        let m = metrics(width, subviews)
+        let rows = (subviews.count + m.cols - 1) / m.cols
+        return CGSize(width: width, height: CGFloat(rows) * m.height + CGFloat(max(rows - 1, 0)) * spacing)
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        let m = metrics(bounds.width, subviews)
+        for (i, view) in subviews.enumerated() {
+            let origin = CGPoint(x: bounds.minX + CGFloat(i % m.cols) * (m.cell + spacing),
+                                 y: bounds.minY + CGFloat(i / m.cols) * (m.height + spacing))
+            view.place(at: origin, proposal: ProposedViewSize(width: m.cell, height: m.height))
         }
-        .buttonStyle(.plain)
-        .help(info.description)
-        .accessibilityAddTraits(isCurrent ? .isSelected : [])
     }
 }
 
-/// A self-explanatory key (letter, number, F-key) as a small keycap: the label is all it needs.
+/// A key in the picker, shown as a small keycap with its short label; its name and description appear on hover.
 private struct KeycodeChip: View {
     let info: KeycodeInfo
     let isCurrent: Bool
     let action: () -> Void
+    let onHover: (Bool) -> Void
 
     var body: some View {
         let shape = RoundedRectangle(cornerRadius: 6, style: .continuous)
@@ -233,8 +244,10 @@ private struct KeycodeChip: View {
                 .contentShape(shape)
         }
         .buttonStyle(.plain)
-        .help(info.name)
+        .onHover(perform: onHover)
+        .help(info.description.isEmpty ? info.name : "\(info.name): \(info.description)")
         .accessibilityLabel(info.name)
+        .accessibilityHint(info.description)
         .accessibilityAddTraits(isCurrent ? .isSelected : [])
     }
 }
